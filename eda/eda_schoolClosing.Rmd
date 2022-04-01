@@ -1,0 +1,97 @@
+---
+title: "eda_school_closings"
+author: "BrunoPalau"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+#explore data of school closings in switzerland
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##load libraries
+```{r}
+library(readr)
+library(ggplot2)
+library(viridis)
+library(tidyverse)
+library(zoo)
+```
+
+##load in data
+```{r}
+closings <- read_csv("/Users/bp/Desktop/ESC403_Data/school-closures-covid.csv")
+closing_switzerland <- closings[closings$Code == "CHE",]
+closing_switzerland$school_closures <- as.factor(closing_switzerland$school_closures)
+closing_switzerland$levels <- factor(closing_switzerland$school_closures, levels=c(0,1,2,3), labels=c("No measures", "Recommended", "Required (only for some levels)", "Required (all levels)"))
+
+full_data <- read_csv("/Users/bp/Desktop/ESC403_Data/full_data.csv")
+switzerland_cases <-full_data[full_data$location == "Switzerland",]
+```
+
+
+##visualize raw data
+```{r}
+count <- closing_switzerland%>%
+  group_by(levels)%>%
+  count()
+
+ggplot(count, aes(x = levels, y = n))+
+  geom_bar(stat = "identity", aes(fill = levels))+
+  ggtitle("number of days in each level")+
+  xlab("")+ ylab("count")+
+  theme(axis.text = element_text(size = 6))
+
+```
+
+```{r}
+#idea: color background according to measures
+subset_cases <- filter(switzerland_cases, date %in% closing_switzerland$Day)
+subset_closure <- filter(closing_switzerland, Day %in% subset_cases$date)
+subset_cases$levels <- subset_closure$levels
+  
+ggplot(subset_cases, aes(x = date, y=new_cases))+
+  geom_point(aes(colour=levels))
+
+#many 0 inbetween very high values -> weekends
+```
+
+```{r}
+#take the 7 day average
+subset_cases <- mutate(subset_cases, seven_days_avg = rollmeanr(new_cases,k=7,fill=c(0,0,0,0,0,0)))
+#plot new values
+ggplot(subset_cases, aes(x = date, y=seven_days_avg))+
+  geom_point(aes(colour=levels))
+#better with 7 days avg
+#still probably will have to seperate by or take into account season.
+
+#estimate the exponential curve before and during the first two weeks of changes in measures, and then the estimate after measure.
+
+#how to seperate which effectis caused by what variable (i.e masks-mandate during lockdowns no real effect?)
+```
+
+```{r}
+ggplot(subset_cases, aes(x=levels,y=seven_days_avg,color=levels))+
+  geom_boxplot()+
+  geom_point(position = position_jitterdodge(jitter.width = 0.2))
+
+#looking at the actual values doesnt tell us much, we need to see the changes in the gradient/prediction -> split into many sensible parts (maybe such a way that we have all combinations of measures)
+```
+##try to infer how long it takes till measures have effect on cases
+```{r}
+#subset by levels and find start aswell as maximum
+some_required <- subset_cases[subset_cases$levels == "Required (only for some levels)",]
+some_peak_data <- some_required[some_required$seven_days_avg == max(some_required$seven_days_avg),]
+some_peak <- some_peak_data$date
+some_start <- min(some_required$date)
+
+all_required <- subset_cases[subset_cases$levels == "Required (all levels)",]
+all_peak_data <- all_required[all_required$seven_days_avg == max(all_required$seven_days_avg),]
+all_peak <- all_peak_data$date
+all_start <- min(all_required$date)
+
+some_peak- some_start
+all_peak - all_start
+#if time differences are so big, does this mean we cant attribute one of the effects to the measure taken or different stringency levels take different time to have an effect?
+```
