@@ -1,0 +1,122 @@
+---
+title: "cases_timeSeries"
+author: "BrunoPalau"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+#time series analysis
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+##load libraries
+```{r}
+library(readr)
+library(ggplot2)
+library(viridis)
+library(tidyverse)
+library(zoo)
+library(dplyr)
+library(lubridate)
+library(forecast)
+
+```
+
+##load in data
+```{r}
+cases <- read_csv("/Users/bp/Desktop/ESC403_Data/owid-covid-data.csv")
+cases_switzerland <- cases[cases$iso_code == "CHE",]
+
+```
+
+# time series analysis with "a little book of r for time series"
+```{r}
+cases_switzerland[is.na(cases_switzerland$new_cases),]$new_cases <- 0
+cases_switzerland[is.na(cases_switzerland$new_cases_smoothed),]$new_cases_smoothed <- 0
+
+
+cases_ts <- ts(cases_switzerland$new_cases, frequency = 365.25, start = decimal_date(ymd("2020-01-22")))
+#plotting time series
+plot.ts(cases_ts)
+
+#plotting smoothed time series
+smoothed_ts <- ts(cases_switzerland$new_cases_smoothed,frequency = 365.25, start = decimal_date(ymd("2020-01-22")))
+plot.ts(smoothed_ts)
+```
+
+## decomposition
+```{r}
+cases_decompose <- decompose(smoothed_ts)
+plot(cases_decompose)
+```
+
+## time series analysis with "forecast"
+```{r}
+# forecasting model using arima model
+fit <- auto.arima(smoothed_ts)
+
+# Next 5 forecasted values
+forecast(fit, 100)
+```
+
+## visualizing forecast
+```{r}
+#idea: separate by variable and forecast some time and compare to real outcome with change of measurements
+plot(forecast(fit, 100), xlab ="Daily smoothed data",
+ylab ="Total Positive Cases",
+main ="COVID-19 Pandemic", col.main ="darkgreen")
+```
+## subset into waves
+```{r}
+first <- subset(cases_switzerland, "2020-05-01" < cases_switzerland$date) 
+first <- subset(first, first$date < "2021-05-01")
+
+second <- subset(cases_switzerland, "2021-05-01" < cases_switzerland$date) 
+second <- subset(second, second$date < "2022-05-01")
+
+plot(y=first$new_cases_smoothed,x=first$date)
+plot(second$new_cases_smoothed,x=second$date)
+```
+
+## fit arima model with single waves
+```{r}
+## analysing single waves not possible as fitting model requires more than one period -> idea: take whole set but smoothen out even more and forecasting doesnt predict much. Maybe compare forecasting at earlier stage with actual outcome during wave (at change in time)
+
+first_ts <- ts(first$new_cases_smoothed,frequency = 365.25, start = decimal_date(ymd("2020-05-01")))
+plot.ts(first_ts)
+# decomposition
+first_decompose <- decompose(first_ts)
+plot(first_decompose)
+# forecasting model using arima model
+first_fit <- auto.arima(first_ts)
+
+# Next 100 forecasted values
+first_forecast <- forecast(first_fit, 100)
+
+# visualize forecast
+plot(first_forecast, xlab ="Daily smoothed data",
+ylab ="Total Positive Cases",
+main ="COVID-19 Pandemic", col.main ="darkgreen")
+
+```
+
+
+```{r}
+#give data till change of measures on 02-11-2020 and see prediction
+first_before <- subset(cases_switzerland,date < "2020-11-02")
+first_before_ts <- ts(first_before$new_cases_smoothed,frequency = 365.25, start = decimal_date(ymd("2020-05-02")))
+plot.ts(first_before_ts)
+
+first_before_fit <- auto.arima(first_before_ts)
+first_before_forecast <- forecast(first_before_fit, 100)
+
+# visualize forecast
+plot(first_before_forecast, xlab ="Daily smoothed data",
+ylab ="Total Positive Cases",
+main ="COVID-19 Pandemic", col.main ="darkgreen")
+
+#with the data given the approach will always suggest almost linear continuation as the peaks and the seasonality are extremely different between the waves so previous data is not enough to understand the pattern -> build our own model using SIR?
+
+```
