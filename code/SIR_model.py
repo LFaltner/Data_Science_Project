@@ -137,10 +137,10 @@ class SIR_model():
         model = cs.SIR
         self.area = {"country": self.country}
         # Add records with SIR model
-        example_data.add(model, **area)
+        self.example_data.add(model, **self.area)
         
         # Records with model variables
-        df = example_data.cleaned()
+        df = self.example_data.cleaned()
         
         # prepare the result dataframe
         # todo: make this drop more general. keep what we need not drop to be more flexible
