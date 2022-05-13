@@ -15,21 +15,24 @@ import warnings
 
 #idea: implement __iter__, __str__
 
-class SIRModel():
+class SIR_model():
     
-    def __init(self, country, start_date, end_date):
+    def __init__(self, country, start_date, end_date):
         """
         Accepted date format: yyyy-mm-dd (e.g. 2020-12-24)
         """
-
-        # todo: define type and other requirments (e.g date format, making sure all needed columns) for variables
+        
         self.country = country
         self.start_date = pd.to_datetime(start_date)
         self.end_date = pd.to_datetime(end_date)
         # load data
         self.load_data()
         # data preparation and cleaning
+        self.prep_data()
 
+        self.start_cond()
+        
+        return self.df_timerange
                 
 
     def load_data(self):
@@ -44,14 +47,9 @@ class SIRModel():
         data_loader = cs.DataLoader(directory="kaggle/input")
         # The number of cases and population values in jhu format
         self.jhu_data = data_loader.jhu()
-
         #cases and deaths whole dataset
         self.total_df = self.jhu_data.total()
-
         #calculate start conditions given start date and cleaned data
-        # todo: make sure date in dataset: raise warning
-        self.start_cond()
-
         # days simulated
         self.total_days = (self.end_date - self.start_date).days
         
@@ -72,17 +70,15 @@ class SIRModel():
         self.whole_country_df = whole_country_df
         
         # define a time range
-        mask = (whole_country_df['Date'] >= self.start_date) & (whole_country_df['Date'] <= self.end_date)
+        mask = (self.whole_country_df['Date'] >= self.start_date) & (self.whole_country_df['Date'] <= self.end_date)
         df_timerange = whole_country_df.loc[mask]
         
-        # todo: is this province shit really needed??
         # drop provinces
         province_mask = df_timerange["Province"] == "-"
         df_timerange = df_timerange.loc[province_mask]
         df_timerange.index = pd.RangeIndex(len(df_timerange))
         #store subsetted data
         self.df_timerange = df_timerange
-        # todo: return/print df_timerange?
     
     def start_cond(self):
         self.start_fatal_recovered = self.df_timerange["Fatal"][0] + self.df_timerange["Recovered"][0]
@@ -90,13 +86,12 @@ class SIRModel():
         self.start_pop = self.df_timerange["Population"][0]
         # as population size is constant, fatal cases have to be subtracted as well
         self.start_susceptible = self.start_pop - self.start_infected - self.start_fatal_recovered
-        
         self.start_dict = {'Fatal or Recovered': self.start_fatal_recovered, 'Infected': self.start_infected,
                            'Susceptible': self.start_susceptible}
         
         
-    def create_sir(self,params={'theta': 0.005, 'kappa': 0.005, 'rho': None, 'sigma': None},sir_f = False,plot=False):
-        # todo: implement SIR-F model as its own class, not just as parameter
+    def create_sir(self,params={'rho': None, 'sigma': None},sir_f = False,plot=False):
+        # todo: implement SIR-F model as its own class, not just as parameter (inher) (theta, kappa)
         """
         Creates SIR model and returns resulting data frame
 
@@ -113,54 +108,53 @@ class SIRModel():
 
         """
         # todo: implement sir f
-
+        # todo: look what params are given and update them
+        
         if params["rho"] == None and params["sigma"] == None:
-            warnings.warn("No value for rho and sigma give. Estimation of both with ....")
+            warnings.warn("No value for rho and sigma given. Estimation of both with ....")
             # self.fit_rho_and_sigma_function()
         elif params["rho"] == None:
-            warnings.warn("No value for rho give. Estimation of rho with ....")
+            warnings.warn("No value for rho given. Estimation of rho with ....")
             # self.fit_rho_function()
         elif params["sigma"] == None:
-            warnings.warn("No value for sigma give. Estimation rho with ....")
+            warnings.warn("No value for sigma given. Estimation of sigma with ....")
             # self.fit_sigma_function()
         
         # set model parameters
-        model = cs.SIR
-        model.EXAMPLE["param_dict"] = params
-        model.EXAMPLE['y0_dict'] = self.start_dict
-        model.EXAMPLE['population'] = self.pop
-        model.EXAMPLE['step_n'] = self.total_days
+        self.model = cs.SIR
+        self.model.EXAMPLE["param_dict"] = params
+        self.model.EXAMPLE['y0_dict'] = self.start_dict
+        self.model.EXAMPLE['population'] = self.start_pop
+        self.model.EXAMPLE['step_n'] = self.total_days
         
         #todo: do check ich nix meh was passiert, stimmt so?
         # Set tau value and start date of records
-        # todo: date format richtig? ja
-
         self.example_data = cs.ExampleData(tau=1440, start_date=self.start_date)
         
         # print Model name and parameters
-        print(f"created {cs.SIR.NAME}-model with:\nparams: {cs.SIR.EXAMPLE['param_dict']}\nstarting conditions:\n\t{cs.SIR.EXAMPLE['y0_dict']}\nsimulating: {cs.SIR.EXAMPLE['step_n']} days")
+        print(f"created {self.model.NAME}-model with:\nparams: {self.model.EXAMPLE['param_dict']}\nstarting conditions:\n\t{self.model.EXAMPLE['y0_dict']}\nsimulating: {self.model.EXAMPLE['step_n']} days")
+        
 
         self.area = {"country": self.country}
         # Add records with SIR model
-        self.example_data.add(model, **self.area)
+        self.example_data.add(self.model, **self.area)
         
         # Records with model variables
         df = self.example_data.cleaned()
         
         # prepare the result dataframe
         # todo: make this drop more general. keep what we need not drop to be more flexible
-        res_df = df.drop(["Country", "Province", "Confirmed", "ISO3", "Population"], axis=1)
+        res_df = df.drop(["Country", "Province", "Confirmed", "ISO3", "Population"], axis = 1)
         
         # add results from the model
         res_df["actual Infected"] = self.df_timerange["Infected"]
         self.res_df = res_df
         
         if plot:
-            #todo: how is it possible that more recovered than infected?
-            cs.line_plot(self.res_df.set_index("Date"), title=f"Plot of {model.NAME} model", y_integer=True)
+            cs.line_plot(self.res_df.set_index("Date"), title=f"Plot of {self.model.NAME} model", y_integer=True)
         return self.res_df
     
-    def create_scenario(self, name, scenario_end, rho_constant=None, sigma_constant=None, kappa_constant=None, theta_constant=None, plot=False):
+    def create_scenario(self, name, scenario_end,rho_constant=None,sigma_constant=None,kappa_constant=None,theta_constant=None,plot=False):
         """
         adding measures and therefore possible changes to parameters
 
@@ -179,20 +173,22 @@ class SIRModel():
         self.snl.register(self.example_data)
 
         # get the records of the scenario instance
+        
         #todo: ist das nötig?
         record_df = self.snl.records(show_plot=False)
         
         # Set 0th phase fro eg from 01Sep2020 to 01Dec2020 with preset parameter values
         self.snl.clear(include_past=True)
-        #todo: time format?
-        #todo: hier automatisch sirf? geht auch sir
         #todo: falls sirf, sicherstellen alle parameter vorhande
         #todo: sicherstellen das alle create_sir vorher aufgerufen wurde!!
         #todo: nicht das gleiche param dict wir params von create_sir?
         
-        self.snl.add(end_date=self.end_date, model=cs.SIRF, **cs.SIR.EXAMPLE["param_dict"])
+        # past phase
+        self.snl.add(end_date=self.end_date, model=self.model, **self.model.EXAMPLE["param_dict"])
+        
         # Add main scenario
-        #todo: only add main scenario once, so that new scenarios can be added without problems
+        
+        #todo: only add main scenario once, so that new scenarios can be added without probelms
         self.snl.add(end_date=scenario_end, name="Main (normal sir)")
         
         # add scenario "name"
@@ -206,17 +202,10 @@ class SIRModel():
         if sigma_constant != None:
             sigma_new = self.snl.get("sigma", phase="0th") * sigma_constant
         else:
-            sigma_new = self.snl.get("kappa", phase="0th")
-        if kappa_constant != None:
-            kappa_new = self.snl.get("kappa", phase="0th") * kappa_constant
-        else:
-            kappa_new = self.snl.get("kappa", phase="0th")
-        if theta_constant != None:
-            theta_new = self.snl.get("theta", phase="0th") * theta_constant
-        else:
-            theta_new = self.snl.get("theta", phase="0th")
+            sigma_new = self.snl.get("sigma", phase="0th")
+
         # Add th 1st phase with the newly calculated params
-        self.snl.add(end_date=scenario_end, name=name, rho=rho_new, kappa=kappa_new, sigma=sigma_new)
+        self.snl.add(end_date=scenario_end, name=name, rho=rho_new)
         
         # print summary
         print(f"{self.snl.summary()}")
@@ -253,10 +242,14 @@ class SIRModel():
     
     
     
+def main():
+    start_date = pd.to_datetime('2020-09-01')
+    end_date = pd.to_datetime('2020-12-01')
+    country = "Switzerland"
+    a = SIR_model(country,start_date,end_date)
+    a.create_sir(params={'theta': 0.005, 'kappa': 0.005, 'rho': 0.2, 'sigma': 0.1})
+    a.create_scenario(name="Lockdown",scenario_end="31Mar2021",rho_constant=0.5,sigma_constant=0.5,plot=True)
     
-    
-    
-    
-    
-    
+if __name__ == "__main__":
+    main()
     
