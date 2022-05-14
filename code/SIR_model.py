@@ -32,7 +32,9 @@ class SIR_model():
 
         self.start_cond()
         
-        return self.df_timerange
+        self.main=False
+        
+        #return self.df_timerange
                 
 
     def load_data(self):
@@ -154,20 +156,9 @@ class SIR_model():
             cs.line_plot(self.res_df.set_index("Date"), title=f"Plot of {self.model.NAME} model", y_integer=True)
         return self.res_df
     
-    def create_scenario(self, name, scenario_end,rho_constant=None,sigma_constant=None,kappa_constant=None,theta_constant=None,plot=False):
-        """
-        adding measures and therefore possible changes to parameters
-
-        Parameters
-        ----------
-         : TYPE
-            DESCRIPTION.
-
-        Returns
-        -------
-        None.
-
-        """
+    
+    def create_main(self):
+        self.main = True
         #todo: only create new snl if no previous snl
         self.snl = cs.Scenario(tau = 1440, **self.area)
         self.snl.register(self.example_data)
@@ -186,26 +177,48 @@ class SIR_model():
         # past phase
         self.snl.add(end_date=self.end_date, model=self.model, **self.model.EXAMPLE["param_dict"])
         
+        
+    
+    def create_scenario(self, name, scenario_end_list,rho_constant_list=None,sigma_constant_list=None,plot=False):
+        """
+        adding measures and therefore possible changes to parameters
+
+        Parameters
+        ----------
+         : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        #todo: check that all lists have same length
+        #todo: create main has to be called before create scenario
+        if not self.main:
+            raise Warning("create main has to be called before create scenario")
+        
         # Add main scenario
         
         #todo: only add main scenario once, so that new scenarios can be added without probelms
-        self.snl.add(end_date=scenario_end, name="Main (normal sir)")
+        for phase_date, rho_constant, sigma_constant in zip(scenario_end_list,rho_constant_list,sigma_constant_list): 
+            self.snl.add(end_date=phase_date, name="Main (normal sir)")
         
-        # add scenario "name"
-        self.snl.clear(name="Lockdown")
-        # adjust original rho value
-        # todo: only adjust those params that are given to this funcion
-        if rho_constant != None:
-            rho_new = self.snl.get("rho", phase="0th") * rho_constant
-        else:
-            rho_new = self.snl.get("rho", phase="0th")
-        if sigma_constant != None:
-            sigma_new = self.snl.get("sigma", phase="0th") * sigma_constant
-        else:
-            sigma_new = self.snl.get("sigma", phase="0th")
+            # add scenario "name"
+            self.snl.clear(name=name)
+            # adjust original rho value
+            # todo: only adjust those params that are given to this funcion
+            if rho_constant != None:
+                rho_new = self.snl.get("rho", phase="0th") * rho_constant
+            else:
+                rho_new = self.snl.get("rho", phase="0th")
+            if sigma_constant != None:
+                sigma_new = self.snl.get("sigma", phase="0th") * sigma_constant
+            else:
+                sigma_new = self.snl.get("sigma", phase="0th")
 
-        # Add th 1st phase with the newly calculated params
-        self.snl.add(end_date=scenario_end, name=name, rho=rho_new)
+            # Add th 1st phase with the newly calculated params
+            self.snl.add(end_date=phase_date, name=name, rho=rho_new,sigma=sigma_new)
         
         # print summary
         print(f"{self.snl.summary()}")
@@ -247,8 +260,9 @@ def main():
     end_date = pd.to_datetime('2020-12-01')
     country = "Switzerland"
     a = SIR_model(country,start_date,end_date)
-    a.create_sir(params={'theta': 0.005, 'kappa': 0.005, 'rho': 0.2, 'sigma': 0.1})
-    a.create_scenario(name="Lockdown",scenario_end="31Mar2021",rho_constant=0.5,sigma_constant=0.5,plot=True)
+    a.create_sir(params={'rho': 0.2, 'sigma': 0.1})
+    a.create_main()
+    a.create_scenario(name="Lockdown",scenario_end_list=["31Mar2021"],rho_constant_list=[0.5],sigma_constant_list=[0.5],plot=True)
     
 if __name__ == "__main__":
     main()
