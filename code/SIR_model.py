@@ -261,22 +261,48 @@ class SIR_model():
         except:
             raise Warning("No res_df. Run create_sir first")
 
-    
+
+    def trend_analysis(self):
+        """
+        Analyses the phases of the wave of infections and estimates their respective parameters.
+
+        Returns
+        -------
+        Dataframe
+        """
+
+        # scenario generation
+        srt = cs.Scenario(country=self.country, province=None)
+        srt.register(self.jhu_data)
+
+        # time period definition
+        srt.timepoints(first_date=self.start_date, last_date=self.end_date, today=self.end_date)
+
+        # phase detection
+        _ = srt.trend(show_figure=False)
+
+        # Parameter estimation of the defined model
+        # Default value of timeout is 180 sec
+        srt.estimate(cs.SIR)
+
+        return srt.summary()
+
+
     def get_plot(self):
         #idea: funktion um plots zu returnen
         pass
 
     
     
-# def main():
-start_date = pd.to_datetime('2020-09-01')
-end_date = pd.to_datetime('2020-12-01')
-country = "Switzerland"
-a = SIR_model(country,start_date,end_date)
-a.create_sir(params={'rho': 0.1, 'sigma': 0.1})
-a.create_main()
-a.create_scenario(name="Lockdown",scenario_end_list=["31Mar2021"],rho_constant_list=[0.5],sigma_constant_list=[1],plot=True)
+def main():
+    start_date = '2020-09-01'
+    end_date = '2020-12-01'
+    country = "Switzerland"
+    a = SIR_model(country,start_date,end_date)
+    a.create_sir(params={'rho': 0.1, 'sigma': 0.1})
+    a.create_main()
+    a.create_scenario(name="Lockdown",scenario_end_list=["31Mar2021"],rho_constant_list=[0.5],sigma_constant_list=[1],plot=True)
 
-# if __name__ == "__main__":
-    # main()
+if __name__ == "__main__":
+    main()
     
