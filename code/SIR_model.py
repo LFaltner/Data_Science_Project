@@ -92,7 +92,7 @@ class SIR_model():
                            'Susceptible': self.start_susceptible}
         
         
-    def create_sir(self,params={'rho': None, 'sigma': None},sir_f = False,plot=False):
+    def create_sir(self,params={'rho': None, 'sigma': None},plot=False):
         # todo: implement SIR-F model as its own class, not just as parameter (inher) (theta, kappa)
         """
         Creates SIR model and returns resulting data frame
@@ -112,15 +112,7 @@ class SIR_model():
         # todo: implement sir f
         # todo: look what params are given and update them
         
-        if params["rho"] == None and params["sigma"] == None:
-            warnings.warn("No value for rho and sigma given. Estimation of both with ....")
-            # self.fit_rho_and_sigma_function()
-        elif params["rho"] == None:
-            warnings.warn("No value for rho given. Estimation of rho with ....")
-            # self.fit_rho_function()
-        elif params["sigma"] == None:
-            warnings.warn("No value for sigma given. Estimation of sigma with ....")
-            # self.fit_sigma_function()
+        self.check_params(params)
         
         # set model parameters
         self.model = cs.SIR
@@ -134,7 +126,7 @@ class SIR_model():
         self.example_data = cs.ExampleData(tau=1440, start_date=self.start_date)
         
         # print Model name and parameters
-        print(f"created {self.model.NAME}-model with:\nparams: {self.model.EXAMPLE['param_dict']}\nstarting conditions:\n\t{self.model.EXAMPLE['y0_dict']}\nsimulating: {self.model.EXAMPLE['step_n']} days")
+        print(f"created {self.model.NAME}-model with:\nparams:\n{self.model.EXAMPLE['param_dict']}\nstarting conditions:\n\t{self.model.EXAMPLE['y0_dict']}\nsimulating: {self.model.EXAMPLE['step_n']} days")
         
 
         self.area = {"country": self.country}
@@ -156,6 +148,16 @@ class SIR_model():
             cs.line_plot(self.res_df.set_index("Date"), title=f"Plot of {self.model.NAME} model", y_integer=True)
         return self.res_df
     
+    def check_params(self,params):
+        if params["rho"] == None and params["sigma"] == None:
+            warnings.warn("No value for rho and sigma given. Estimation of both with ....")
+            # self.fit_rho_and_sigma_function()
+        elif params["rho"] == None:
+            warnings.warn("No value for rho given. Estimation of rho with ....")
+            # self.fit_rho_function()
+        elif params["sigma"] == None:
+            warnings.warn("No value for sigma given. Estimation of sigma with ....")
+            # self.fit_sigma_function()
     
     def create_main(self):
         self.main = True
@@ -193,6 +195,7 @@ class SIR_model():
         None.
 
         """
+        # todo: check that all inputs are lists
         #todo: check that all lists have same length
         #todo: create main has to be called before create scenario
         if not self.main:
@@ -201,23 +204,24 @@ class SIR_model():
         # Add main scenario
         
         #todo: only add main scenario once, so that new scenarios can be added without probelms
-        for phase_date, rho_constant, sigma_constant in zip(scenario_end_list,rho_constant_list,sigma_constant_list): 
-            self.snl.add(end_date=phase_date, name="Main (normal sir)")
+        for i,(phase_date, rho_constant, sigma_constant) in enumerate(zip(scenario_end_list,rho_constant_list,sigma_constant_list)): 
+            # todo: cant main be renamed to something more meaingful?
+            self.snl.add(end_date=phase_date, name="Main")
         
             # add scenario "name"
             self.snl.clear(name=name)
             # adjust original rho value
             # todo: only adjust those params that are given to this funcion
             if rho_constant != None:
-                rho_new = self.snl.get("rho", phase="0th") * rho_constant
+                rho_new = self.snl.get("rho", phase=f"{i}th") * rho_constant
             else:
-                rho_new = self.snl.get("rho", phase="0th")
+                rho_new = self.snl.get("rho", phase=f"{i}th")
             if sigma_constant != None:
-                sigma_new = self.snl.get("sigma", phase="0th") * sigma_constant
+                sigma_new = self.snl.get("sigma", phase=f"{i}th") * sigma_constant
             else:
-                sigma_new = self.snl.get("sigma", phase="0th")
+                sigma_new = self.snl.get("sigma", phase=f"{i}th")
 
-            # Add th 1st phase with the newly calculated params
+            # Add th i-th phase with the newly calculated params
             self.snl.add(end_date=phase_date, name=name, rho=rho_new,sigma=sigma_new)
         
         # print summary
@@ -226,8 +230,17 @@ class SIR_model():
             #todo: plot for all values changed
             #questoin: plotted das automatisch? sollen rt und andere immer geplotted werden?
             _ = self.snl.history(target="Rt")
-            _ = self.snl.history(target="Infected")
-            self.snl.history(target="rho").head()
+            # todo: infected plot in this case is the df, where actual values are missing.
+            # .. we either have to insert missing actual values beforehand for that time or impede function from plotting and plot it ourselves
+            self.z = infected_plot = self.snl.history(target="Infected",show_plot=False)
+            # try to get better plot by creating own plot
+            fig, ax = plt.subplots()
+            print(infected_plot.columns)
+            print(infected_plot)
+            ax.plot(infected_plot["Name"],infected_plot["Actual"])
+            ax.plot(infected_plot["Name"],infected_plot["Lockdown"])
+            ax.plot(infected_plot["Name"],infected_plot["Main"])
+            _ = self.snl.history(target="rho").head()
             
     def simluate_scenario(self, name):
         #todo: raise error wenn name kein scenario ist
@@ -252,18 +265,18 @@ class SIR_model():
     def get_plot(self):
         #idea: funktion um plots zu returnen
         pass
+
     
     
-    
-def main():
-    start_date = pd.to_datetime('2020-09-01')
-    end_date = pd.to_datetime('2020-12-01')
-    country = "Switzerland"
-    a = SIR_model(country,start_date,end_date)
-    a.create_sir(params={'rho': 0.2, 'sigma': 0.1})
-    a.create_main()
-    a.create_scenario(name="Lockdown",scenario_end_list=["31Mar2021"],rho_constant_list=[0.5],sigma_constant_list=[0.5],plot=True)
-    
-if __name__ == "__main__":
-    main()
+# def main():
+start_date = pd.to_datetime('2020-09-01')
+end_date = pd.to_datetime('2020-12-01')
+country = "Switzerland"
+a = SIR_model(country,start_date,end_date)
+a.create_sir(params={'rho': 0.1, 'sigma': 0.1})
+a.create_main()
+a.create_scenario(name="Lockdown",scenario_end_list=["31Mar2021"],rho_constant_list=[0.5],sigma_constant_list=[1],plot=True)
+
+# if __name__ == "__main__":
+    # main()
     
