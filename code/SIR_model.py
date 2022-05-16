@@ -85,6 +85,10 @@ class SIR_model():
         df_timerange.index = pd.RangeIndex(len(df_timerange))
         #store subsetted data
         self.df_timerange = df_timerange
+        
+        self.actual_df,_ = self.jhu_data.records(country="Switzerland")
+        self.actual_df = self.actual_df.set_index("Date")
+        self.actual_df.plot()
     
     def start_cond(self):
         self.start_fatal_recovered = self.df_timerange["Fatal"][0] + self.df_timerange["Recovered"][0]
@@ -214,8 +218,6 @@ class SIR_model():
             # todo: cant main be renamed to something more meaingful?
             self.snl.add(end_date=phase_date, name="Main")
         
-            # add scenario "name"
-            self.snl.clear(name=name)
             # adjust original rho value
             # todo: only adjust those params that are given to this funcion
             if rho_constant != None:
@@ -235,19 +237,21 @@ class SIR_model():
         if plot:
             #todo: plot for all values changed
             #questoin: plotted das automatisch? sollen rt und andere immer geplotted werden?
+            self.z = infected_plot = self.snl.history(target="Infected",show_figure=False)
+
             _ = self.snl.history(target="Rt")
-            # todo: infected plot in this case is the df, where actual values are missing.
-            # .. we either have to insert missing actual values beforehand for that time or impede function from plotting and plot it ourselves
-            self.z = infected_plot = self.snl.history(target="Infected",show_plot=False)
-            # try to get better plot by creating own plot
-            mask = np.array([(pd.to_datetime(self.whole_country_df['Date'],format="%Y%m%d%H%M%S") >= self.z.index[0]) & (pd.to_datetime(self.whole_country_df['Date'],format="%Y%m%d%H%M%S") <= self.z.index[-1])]).reshape(-1)
+            mask = np.array([(pd.to_datetime(self.actual_df.index) >= self.z.index[0]) & (pd.to_datetime(self.actual_df.index) <= self.z.index[-1])]).reshape(-1)
             fig, ax = plt.subplots()
-            self.z["Actual"] = self.whole_country_df.loc[mask]["Infected"].values
-            print(self.z)
+            self.z["Actual"] = self.actual_df.loc[mask]["Infected"].values
             ax.plot(self.z.index,self.z["Actual"],label="Acutal")
             ax.plot(self.z.index,self.z[name],label=name)
             ax.plot(self.z.index,self.z["Main"],label="Main")
             plt.legend()
+            # todo: infected plot in this case is the df, where actual values are missing.
+            # .. we either have to insert missing actual values beforehand for that time or impede function from plotting and plot it ourselves
+            # try to get better plot by creating own plot
+            
+            
             _ = self.snl.history(target="rho").head()
             
     def simluate_scenario(self, name):
@@ -302,27 +306,18 @@ class SIR_model():
 
 def one_scenario():
     start_date = '2020-09-01'
-    end_date = '2020-12-01'
+    end_date = '2021-03-01'
     country = "Switzerland"
     a = SIR_model(country,start_date,end_date)
-    a.create_sir(params={'rho': 0.1, 'sigma': 0.15})
+    a.create_sir(params={'rho': 0.5, 'sigma': 0.01})
     a.create_main()
     a.create_scenario(name="Lockdown",scenario_end_list=["31Mar2021","20Apr2021","30Apr2021"],rho_constant_list=[0.5,2,0.5],sigma_constant_list=[2,0.5,1],plot=True)
-    
+
+
 def mul_scenarios():
     pass
+    
 
-def per_day(a):
-    liste = []
-    for i,inf in enumerate(a.whole_country_df["Infected"].iloc[:-1]):
-        infected = a.whole_country_df["Infected"].iloc[i] - a.whole_country_df["Infected"].iloc[i+1]
-        liste.append(infected)
-    print(infected)
-    
-    
-def main():
-    one_scenario()
 
-if __name__ == "__main__":
-    main()
-    
+# a = one_scenario()
+# inf = per_day(a)
