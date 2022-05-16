@@ -10,10 +10,12 @@ Created on Thu May 12 19:50:49 2022
 import pandas as pd
 import covsirphy as cs
 import matplotlib.pyplot as plt
+import numpy as np
 from pprint import pprint
 import warnings
 
 #idea: implement __iter__, __str__
+phase_names = ["0th","1st","2nd","3rd","4th","5th"]
 
 class SIR_model():
     
@@ -70,14 +72,16 @@ class SIR_model():
         whole_country_df['Date'] = pd.to_datetime(whole_country_df['Date'])
         # store whole cleaned data
         self.whole_country_df = whole_country_df
+        province_mask = self.whole_country_df["Province"] == "-"
+        self.whole_country_df = self.whole_country_df.loc[province_mask]
         
         # define a time range
         mask = (self.whole_country_df['Date'] >= self.start_date) & (self.whole_country_df['Date'] <= self.end_date)
-        df_timerange = whole_country_df.loc[mask]
+        df_timerange = self.whole_country_df.loc[mask]
         
         # drop provinces
-        province_mask = df_timerange["Province"] == "-"
-        df_timerange = df_timerange.loc[province_mask]
+        # province_mask = df_timerange["Province"] == "-"
+        # df_timerange = df_timerange.loc[province_mask]
         df_timerange.index = pd.RangeIndex(len(df_timerange))
         #store subsetted data
         self.df_timerange = df_timerange
@@ -201,10 +205,12 @@ class SIR_model():
         if not self.main:
             raise Warning("create main has to be called before create scenario")
         
-        # Add main scenario
+        # Add new scenario
+        self.snl.clear(name=name)
         
         #todo: only add main scenario once, so that new scenarios can be added without probelms
-        for i,(phase_date, rho_constant, sigma_constant) in enumerate(zip(scenario_end_list,rho_constant_list,sigma_constant_list)): 
+        for i,(phase_date, rho_constant, sigma_constant) in enumerate(zip(scenario_end_list,rho_constant_list,sigma_constant_list)):
+            print(f"{i}, {phase_date}, {rho_constant}, {sigma_constant}")
             # todo: cant main be renamed to something more meaingful?
             self.snl.add(end_date=phase_date, name="Main")
         
@@ -213,13 +219,13 @@ class SIR_model():
             # adjust original rho value
             # todo: only adjust those params that are given to this funcion
             if rho_constant != None:
-                rho_new = self.snl.get("rho", phase=f"{i}th") * rho_constant
+                rho_new = self.snl.get("rho", phase=phase_names[i]) * rho_constant
             else:
-                rho_new = self.snl.get("rho", phase=f"{i}th")
+                rho_new = self.snl.get("rho", phase=phase_names[i])
             if sigma_constant != None:
-                sigma_new = self.snl.get("sigma", phase=f"{i}th") * sigma_constant
+                sigma_new = self.snl.get("sigma", phase=phase_names[i]) * sigma_constant
             else:
-                sigma_new = self.snl.get("sigma", phase=f"{i}th")
+                sigma_new = self.snl.get("sigma", phase=phase_names[i])
 
             # Add th i-th phase with the newly calculated params
             self.snl.add(end_date=phase_date, name=name, rho=rho_new,sigma=sigma_new)
@@ -234,12 +240,14 @@ class SIR_model():
             # .. we either have to insert missing actual values beforehand for that time or impede function from plotting and plot it ourselves
             self.z = infected_plot = self.snl.history(target="Infected",show_plot=False)
             # try to get better plot by creating own plot
+            mask = np.array([(pd.to_datetime(self.whole_country_df['Date'],format="%Y%m%d%H%M%S") >= self.z.index[0]) & (pd.to_datetime(self.whole_country_df['Date'],format="%Y%m%d%H%M%S") <= self.z.index[-1])]).reshape(-1)
             fig, ax = plt.subplots()
-            print(infected_plot.columns)
-            print(infected_plot)
-            ax.plot(infected_plot["Name"],infected_plot["Actual"])
-            ax.plot(infected_plot["Name"],infected_plot["Lockdown"])
-            ax.plot(infected_plot["Name"],infected_plot["Main"])
+            self.z["Actual"] = self.whole_country_df.loc[mask]["Infected"].values
+            print(self.z)
+            ax.plot(self.z.index,self.z["Actual"],label="Acutal")
+            ax.plot(self.z.index,self.z[name],label=name)
+            ax.plot(self.z.index,self.z["Main"],label="Main")
+            plt.legend()
             _ = self.snl.history(target="rho").head()
             
     def simluate_scenario(self, name):
@@ -292,16 +300,28 @@ class SIR_model():
         #idea: funktion um plots zu returnen
         pass
 
-    
-    
-def main():
+def one_scenario():
     start_date = '2020-09-01'
     end_date = '2020-12-01'
     country = "Switzerland"
     a = SIR_model(country,start_date,end_date)
-    a.create_sir(params={'rho': 0.1, 'sigma': 0.1})
+    a.create_sir(params={'rho': 0.1, 'sigma': 0.15})
     a.create_main()
-    a.create_scenario(name="Lockdown",scenario_end_list=["31Mar2021"],rho_constant_list=[0.5],sigma_constant_list=[1],plot=True)
+    a.create_scenario(name="Lockdown",scenario_end_list=["31Mar2021","20Apr2021","30Apr2021"],rho_constant_list=[0.5,2,0.5],sigma_constant_list=[2,0.5,1],plot=True)
+    
+def mul_scenarios():
+    pass
+
+def per_day(a):
+    liste = []
+    for i,inf in enumerate(a.whole_country_df["Infected"].iloc[:-1]):
+        infected = a.whole_country_df["Infected"].iloc[i] - a.whole_country_df["Infected"].iloc[i+1]
+        liste.append(infected)
+    print(infected)
+    
+    
+def main():
+    one_scenario()
 
 if __name__ == "__main__":
     main()
