@@ -143,10 +143,10 @@ class SIRF_model(SIR_model):
                     
                 # adjust original param values
                 # always update rho and sigma. If no change is desired than same constant has to be given as input                rho_new = self.snl.get("rho", phase=f"{i}th") * rho_constant
-                rho_new = self.snl.get("rho", phase=phase_names[i]) * rho_constant
-                sigma_new = self.snl.get("sigma", phase=phase_names[i]) * sigma_constant
-                kappa_new = self.snl.get("kappa", phase=phase_names[i]) * kappa_constant
-                theta_new = self.snl.get("theta", phase=phase_names[i]) * theta_constant
+                rho_new = self.snl.get("rho", phase="0th") * rho_constant
+                sigma_new = self.snl.get("sigma", phase="0th") * sigma_constant
+                kappa_new = self.snl.get("kappa", phase="0th") * kappa_constant
+                theta_new = self.snl.get("theta", phase="0th") * theta_constant
                 
                 # Add th i-th phase with the newly calculated params
                 self.snl.add(end_date=phase_date, name=name, rho=rho_new,sigma=sigma_new,kappa=kappa_new,theta=theta_new)

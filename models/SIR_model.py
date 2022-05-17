@@ -250,9 +250,9 @@ class SIR_model():
                 
 
             # always update rho and sigma. If no change is desired than same constant has to be given as input
-            rho_new = self.snl.get("rho", phase=phase_names[i]) * rho_constant
+            rho_new = self.snl.get("rho", phase="0th") * rho_constant
 
-            sigma_new = self.snl.get("sigma", phase=phase_names[i]) * sigma_constant
+            sigma_new = self.snl.get("sigma", phase="0th") * sigma_constant
 
             # Add th i-th phase with the newly calculated params
             self.snl.add(end_date=phase_date, name=name, rho=rho_new,sigma=sigma_new)
