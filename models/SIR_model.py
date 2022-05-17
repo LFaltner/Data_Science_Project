@@ -50,7 +50,7 @@ class SIR_model():
         """
         # data will be downloaded if existing files are older than 72h
         print("Checking if data is up-to-date... ")
-        kaggle_path = sys.path[0] + '/kaggle/input'
+        kaggle_path = sys.path[0] + '../kaggle/input'
         data_loader = cs.DataLoader(directory=kaggle_path, update_interval=72)
 
         # The number of cases and population values in jhu format
@@ -103,7 +103,7 @@ class SIR_model():
                            'Susceptible': self.start_susceptible}
         
         
-    def create_sir(self,params,plot=False):
+    def create_sir(self,params={"rho":None,"sigma":None},plot=False):
         # todo: implement SIR-F model as its own class, not just as parameter (inher) (theta, kappa)
         """
         Creates SIR model and returns resulting data frame
@@ -124,7 +124,6 @@ class SIR_model():
         # todo: implement sir f
         # todo: look what params are given and update them
 
-        params = {'rho': rho, 'sigma': sigma}
         params = self.check_params(params)
 
         # set model parameters
