@@ -10,10 +10,12 @@ import pandas as pd
 import covsirphy as cs
 import matplotlib.pyplot as plt
 from SIR_model import SIR_model
+import numpy as np
 from pprint import pprint
 import warnings
 
 
+phase_names = ["0th","1st","2nd","3rd","4th","5th"]
 
 
 # SIRF subclass
@@ -24,20 +26,21 @@ class SIRF_model(SIR_model):
         if params["rho"] == None and params["sigma"] == None:
             warnings.warn("No value for rho and sigma given. Estimation of both with ....")
             # self.fit_rho_and_sigma_function()
-        elif params["rho"] == None:
-            warnings.warn("No value for rho given. Estimation of rho with ....")
-            # self.fit_rho_function()
-        elif params["sigma"] == None:
-            warnings.warn("No value for sigma given. Estimation of sigma with ....")
-            # self.fit_sigma_function()
-        
+        else:
+            if params["rho"] == None:
+                warnings.warn("No value for rho given. Estimation of rho with ....")
+                # self.fit_rho_function()
+            elif params["sigma"] == None:
+                warnings.warn("No value for sigma given. Estimation of sigma with ....")
+                # self.fit_sigma_function()
+            
         # make sure all required params are given
         if params["kappa"] == None or params["sigma"] == None:
             raise Warning("kappa and sigma needed for SIR-F model")
         
         
         
-    def create_sir(self,params={'rho': None, 'sigma': None},plot=False):
+    def create_sir(self,params,plot=False):
         # todo: implement SIR-F model as its own class, not just as parameter (inher) (theta, kappa)
         """
         Creates SIR model and returns resulting data frame
@@ -54,6 +57,8 @@ class SIRF_model(SIR_model):
         None.
 
         """
+        self.create = True
+
         # todo: implement sir f
         # todo: look what params are given and update them
         
@@ -114,50 +119,45 @@ class SIRF_model(SIR_model):
                 raise Warning("create main has to be called before create scenario")
             
             # Add main scenario
+            self.snl.clear(name=name)
+            self.scenario_names.append(name)
             
             #todo: only add main scenario once, so that new scenarios can be added without probelms
             for i,(phase_date, rho_constant, sigma_constant, kappa_constant, theta_constant) in enumerate(zip(scenario_end_list,rho_constant_list,sigma_constant_list,kappa_constant_list,theta_constant_list)): 
                 # todo: cant main be renamed to something more meaingful?
-                self.snl.add(end_date=phase_date, name="Main")
-            
-                # add scenario "name"
-                self.snl.clear(name=name)
-                # adjust original rho value
-                # todo: only adjust those params that are given to this funcion
-                if rho_constant != None:
-                    rho_new = self.snl.get("rho", phase=f"{i}th") * rho_constant
-                else:
-                    rho_new = self.snl.get("rho", phase=f"{i}th")
-                if sigma_constant != None:
-                    sigma_new = self.snl.get("sigma", phase=f"{i}th") * sigma_constant
-                else:
-                    sigma_new = self.snl.get("sigma", phase=f"{i}th")
-                if kappa_constant != None:
-                    kappa_new = self.snl.get("kappa", phase=f"{i}th") * kappa_constant
-                else:
-                    kappa_new = self.snl.get("kappa", phase=f"{i}th")
-                if theta_constant != None:
-                    theta_new = self.snl.get("theta", phase=f"{i}th") * theta_constant
-                else:
-                    theta_new = self.snl.get("theta", phase=f"{i}th")
-    
+                phase_date = pd.to_datetime(phase_date)
+                # todo: cant main be renamed to something more meaingful?
+                # only add phase if it goes beyond last added phase
+                if phase_date > self.last_phase_added:
+                    self.snl.add(end_date=phase_date, name="Main")
+                    self.last_phase_added = phase_date   
+                    
+                # adjust original param values
+                # always update rho and sigma. If no change is desired than same constant has to be given as input                rho_new = self.snl.get("rho", phase=f"{i}th") * rho_constant
+                rho_new = self.snl.get("rho", phase=phase_names[i]) * rho_constant
+                sigma_new = self.snl.get("sigma", phase=phase_names[i]) * sigma_constant
+                kappa_new = self.snl.get("kappa", phase=phase_names[i]) * kappa_constant
+                theta_new = self.snl.get("theta", phase=phase_names[i]) * theta_constant
+                
                 # Add th i-th phase with the newly calculated params
-                self.snl.add(end_date=phase_date, name=name, rho=rho_new,sigma=sigma_new)
+                self.snl.add(end_date=phase_date, name=name, rho=rho_new,sigma=sigma_new,kappa=kappa_new,theta=theta_new)
             
             # print summary
             print(f"{self.snl.summary()}")
+            # get dataframe with Infected, Main, and scenario
+            self.phases_plot = self.snl.history(target="Infected",show_figure=False)
+
+            mask = np.array([(pd.to_datetime(self.actual_df.index) >= self.phases_plot.index[0]) & (pd.to_datetime(self.actual_df.index) <= self.phases_plot.index[-1])]).reshape(-1)
+            fig, ax = plt.subplots()
+            self.phases_plot["Actual"] = self.actual_df.loc[mask]["Infected"].values
+            ax.plot(self.phases_plot.index,self.phases_plot["Actual"],label="Acutal")
+            ax.plot(self.phases_plot.index,self.phases_plot["Main"],label="Main")
             if plot:
                 #todo: plot for all values changed
                 #questoin: plotted das automatisch? sollen rt und andere immer geplotted werden?
                 _ = self.snl.history(target="Rt")
-                # todo: infected plot in this case is the df, where actual values are missing.
-                # .. we either have to insert missing actual values beforehand for that time or impede function from plotting and plot it ourselves
-                self.z = infected_plot = self.snl.history(target="Infected",show_plot=False)
-                # try to get better plot by creating own plot
-                fig, ax = plt.subplots()
-                print(infected_plot.columns)
-                print(infected_plot)
-                ax.plot(infected_plot["Name"],infected_plot["Actual"])
-                ax.plot(infected_plot["Name"],infected_plot["Lockdown"])
-                ax.plot(infected_plot["Name"],infected_plot["Main"])
-                _ = self.snl.history(target="rho").head()    
+                # _ = self.snl.history(target="Confirmed")
+                _ = self.snl.history(target="rho").head()
+                _ = self.snl.history(target="kappa").head()
+                _ = self.snl.history(target="theta").head()
+            return self.phases_plot,self.snl.describe()

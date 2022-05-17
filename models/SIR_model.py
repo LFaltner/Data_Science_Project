@@ -48,7 +48,7 @@ class SIR_model():
         """
         # data will be downloaded if existing files are older than 72h
         print("Checking if data is up-to-date... ")
-        kaggle_path = sys.path[0] + '/kaggle/input'
+        kaggle_path = sys.path[0] + '../kaggle/input'
         data_loader = cs.DataLoader(directory=kaggle_path, update_interval=72)
 
         # The number of cases and population values in jhu format
@@ -103,19 +103,18 @@ class SIR_model():
         self.start_dict = {'Fatal or Recovered': self.start_fatal_recovered, 'Infected': self.start_infected,
                            'Susceptible': self.start_susceptible}
 
-    def create_sir(self, rho: float = None, sigma: float = None, plot: bool = False):
+
+    def create_sir(self,params={"rho":None,"sigma":None},plot=False):
         # todo: implement SIR-F model as its own class, not just as parameter (inher) (theta, kappa)
         """
         Creates SIR model and returns resulting data frame
 
         Parameters
         ----------
-        rho : FLOAT, optional
-            The default is rho=None.
-        sigma : FLOAT, optional
-            The default is sigma=None.
-        plot : BOOL, optional
-            The default is plot=False.
+        params : TYPE, optional
+            DESCRIPTION. The default is {'theta': 0.005, 'kappa': 0.005, 'rho': None, 'sigma': None}.
+        sir_f : TYPE, optional
+            DESCRIPTION. The default is False.
 
         Returns
         -------
@@ -126,7 +125,6 @@ class SIR_model():
         # todo: implement sir f
         # todo: look what params are given and update them
 
-        params = {'rho': rho, 'sigma': sigma}
         params = self.check_params(params)
 
         # set model parameters
@@ -141,8 +139,7 @@ class SIR_model():
         self.example_data = cs.ExampleData(tau=1440, start_date=self.start_date)
 
         # print Model name and parameters
-        print(
-            f"created {self.model.NAME}-model with:\nparams:\n{self.model.EXAMPLE['param_dict']}\nstarting conditions:\n\t{self.model.EXAMPLE['y0_dict']}\nsimulating: {self.model.EXAMPLE['step_n']} days")
+        print(f"created {self.model.NAME}-model with:\nparams:\n\t{self.model.EXAMPLE['param_dict']}\nstarting conditions:\n\t{self.model.EXAMPLE['y0_dict']}\nsimulating: {self.model.EXAMPLE['step_n']} days")
 
         self.area = {"country": self.country}
         # Add records with SIR model
@@ -184,6 +181,7 @@ class SIR_model():
 
         else:
             return params
+
 
     def create_main(self):
         if not self.create:
@@ -233,10 +231,14 @@ class SIR_model():
         # create main has to be called before create scenario
         if not self.main:
             raise Warning("create main has to be called before create scenario")
+        if name not in self.scenario_names:
+            self.scenario_names.append(name)
+        else:
+            raise Warning("Scenario already exists")
 
         # Add new scenario
         self.snl.clear(name=name)
-        self.scenario_names.append(name)
+
 
         #todo: only add main scenario once, so that new scenarios can be added without probelms
         for i,(phase_date, rho_constant, sigma_constant) in enumerate(zip(scenario_end_list,rho_constant_list,sigma_constant_list)):
@@ -247,7 +249,7 @@ class SIR_model():
                 self.snl.add(end_date=phase_date, name="Main")
                 self.last_phase_added = phase_date
 
-            # adjust original rho value
+
             # always update rho and sigma. If no change is desired than same constant has to be given as input
             rho_new = self.snl.get("rho", phase=phase_names[i]) * rho_constant
 
@@ -260,26 +262,49 @@ class SIR_model():
         print(f"{self.snl.summary()}")
         # todo: make sure smae scenario has same color in all plots
         # todo: plot estimated "rho" of real life?
+        # get dataframe with Infected, Main, and scenario
+        self.infected_plot = self.snl.history(target="Infected",show_figure=False)
+        # get dataframe for total confirmed cases
+        self.confirmed_plot = self.snl.history(target="Confirmed",show_figure=False)
+
+        mask = np.array([(pd.to_datetime(self.actual_df.index) >= self.infected_plot.index[0]) & (pd.to_datetime(self.actual_df.index) <= self.infected_plot.index[-1])]).reshape(-1)
+        self.infected_plot["Actual"] = self.actual_df.loc[mask]["Infected"].values
+        self.confirmed_plot["Actual"] = self.actual_df.loc[mask]["Confirmed"].values
+
+        # prepare plots
+        # todo: make plots bigger
+        fig, (ax_inf,ax_conf) = plt.subplots(nrows=2,ncols=1,sharex=True)
+        ax_inf.set_title("Active Infected")
+        ax_conf.set_title("Total confirmed cases")
+        # plot actual and main infected
+        ax_inf.plot(self.infected_plot.index,self.infected_plot["Actual"],label="Acutal")
+        ax_inf.plot(self.infected_plot.index,self.infected_plot["Main"],label="Main")
+        # plot actual and main confirmed
+        ax_conf.plot(self.confirmed_plot.index,self.confirmed_plot["Actual"],label="Acutal")
+        ax_conf.plot(self.confirmed_plot.index,self.confirmed_plot["Main"],label="Main")
+
+
+        for name in self.scenario_names:
+            ax_inf.plot(self.infected_plot.index,self.infected_plot[name],label=name)
+            ax_conf.plot(self.confirmed_plot.index,self.confirmed_plot[name],label=name)
+        plt.legend()
+
         if plot:
-            # get dataframe with Infected, Main, and scenario
-            self.phases_plot = self.snl.history(target="Infected",show_figure=False)
-
-            mask = np.array([(pd.to_datetime(self.actual_df.index) >= self.phases_plot.index[0]) & (pd.to_datetime(self.actual_df.index) <= self.phases_plot.index[-1])]).reshape(-1)
-            fig, ax = plt.subplots()
-            self.phases_plot["Actual"] = self.actual_df.loc[mask]["Infected"].values
-            ax.plot(self.phases_plot.index,self.phases_plot["Actual"],label="Acutal")
-            ax.plot(self.phases_plot.index,self.phases_plot["Main"],label="Main")
-            for name in self.scenario_names:
-                ax.plot(self.phases_plot.index,self.phases_plot[name],label=name)
-            plt.legend()
-
             # todo: what other variables should be visualized?
             _ = self.snl.history(target="Rt")
             _ = self.snl.history(target="rho").head()
+            _ = self.snl.history(target="sigma").head()
 
-    def simluate_scenario(self, name):
-        # todo: raise error wenn name kein scenario ist
-        _ = self.snl.simulate(name=name)
+        # todo: how to stop describe from printing
+        return self.infected_plot,self.confirmed_plot #,self.snl.describe()
+
+    def simulate_scenario(self, name):
+        #todo: raise error wenn name kein scenario ist
+        if name not in self.scenario_names:
+            raise Warning("Scenario does not exist")
+        df = self.snl.simulate(name = name)
+        return df
+
 
     def get_res_df(self):
         """
