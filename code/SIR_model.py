@@ -35,6 +35,7 @@ class SIR_model():
         self.start_cond()
         
         self.main=False
+        self.create=False
         
         #return self.df_timerange
                 
@@ -117,6 +118,7 @@ class SIR_model():
         None.
 
         """
+        self.create = True
         # todo: implement sir f
         # todo: look what params are given and update them
         
@@ -168,13 +170,17 @@ class SIR_model():
             # self.fit_sigma_function()
     
     def create_main(self):
+        if not self.create:
+            raise Warning("create_sir has to be called before create_main")
+        
         self.main = True
-        #todo: only create new snl if no previous snl
+        self.scenario_names = []
+
+        # use create_main as reset function for object
         self.snl = cs.Scenario(tau = 1440, **self.area)
         self.snl.register(self.example_data)
 
         # get the records of the scenario instance
-        
         #todo: ist das nötig?
         record_df = self.snl.records(show_plot=False)
         
@@ -186,7 +192,8 @@ class SIR_model():
         
         # past phase
         self.snl.add(end_date=self.end_date, model=self.model, **self.model.EXAMPLE["param_dict"])
-        
+        # store date of last scenario added to main
+        self.last_phase_added=self.end_date
         
     
     def create_scenario(self, name, scenario_end_list,rho_constant_list=None,sigma_constant_list=None,plot=False):
@@ -205,53 +212,54 @@ class SIR_model():
         """
         # todo: check that all inputs are lists
         #todo: check that all lists have same length
-        #todo: create main has to be called before create scenario
+        
+        
+        # create main has to be called before create scenario
         if not self.main:
             raise Warning("create main has to be called before create scenario")
         
         # Add new scenario
         self.snl.clear(name=name)
+        self.scenario_names.append(name)
         
         #todo: only add main scenario once, so that new scenarios can be added without probelms
         for i,(phase_date, rho_constant, sigma_constant) in enumerate(zip(scenario_end_list,rho_constant_list,sigma_constant_list)):
-            print(f"{i}, {phase_date}, {rho_constant}, {sigma_constant}")
+            phase_date = pd.to_datetime(phase_date)
             # todo: cant main be renamed to something more meaingful?
-            self.snl.add(end_date=phase_date, name="Main")
-        
+            # only add phase if it goes beyond last added phase
+            if phase_date > self.last_phase_added:
+                self.snl.add(end_date=phase_date, name="Main")
+                self.last_phase_added = phase_date
+                
             # adjust original rho value
-            # todo: only adjust those params that are given to this funcion
-            if rho_constant != None:
-                rho_new = self.snl.get("rho", phase=phase_names[i]) * rho_constant
-            else:
-                rho_new = self.snl.get("rho", phase=phase_names[i])
-            if sigma_constant != None:
-                sigma_new = self.snl.get("sigma", phase=phase_names[i]) * sigma_constant
-            else:
-                sigma_new = self.snl.get("sigma", phase=phase_names[i])
-
+            # always update rho and sigma. If no change is desired than same constant has to be given as input
+            rho_new = self.snl.get("rho", phase=phase_names[i]) * rho_constant
+            
+            sigma_new = self.snl.get("sigma", phase=phase_names[i]) * sigma_constant
+            
             # Add th i-th phase with the newly calculated params
             self.snl.add(end_date=phase_date, name=name, rho=rho_new,sigma=sigma_new)
         
+        
         # print summary
         print(f"{self.snl.summary()}")
+        # todo: make sure smae scenario has same color in all plots
+        # todo: plot estimated "rho" of real life?
         if plot:
-            #todo: plot for all values changed
-            #questoin: plotted das automatisch? sollen rt und andere immer geplotted werden?
-            self.z = infected_plot = self.snl.history(target="Infected",show_figure=False)
+            # get dataframe with Infected, Main, and scenario
+            self.phases_plot = self.snl.history(target="Infected",show_figure=False)
 
-            _ = self.snl.history(target="Rt")
-            mask = np.array([(pd.to_datetime(self.actual_df.index) >= self.z.index[0]) & (pd.to_datetime(self.actual_df.index) <= self.z.index[-1])]).reshape(-1)
+            mask = np.array([(pd.to_datetime(self.actual_df.index) >= self.phases_plot.index[0]) & (pd.to_datetime(self.actual_df.index) <= self.phases_plot.index[-1])]).reshape(-1)
             fig, ax = plt.subplots()
-            self.z["Actual"] = self.actual_df.loc[mask]["Infected"].values
-            ax.plot(self.z.index,self.z["Actual"],label="Acutal")
-            ax.plot(self.z.index,self.z[name],label=name)
-            ax.plot(self.z.index,self.z["Main"],label="Main")
+            self.phases_plot["Actual"] = self.actual_df.loc[mask]["Infected"].values
+            ax.plot(self.phases_plot.index,self.phases_plot["Actual"],label="Acutal")
+            ax.plot(self.phases_plot.index,self.phases_plot["Main"],label="Main")
+            for name in self.scenario_names:
+                ax.plot(self.phases_plot.index,self.phases_plot[name],label=name)
             plt.legend()
-            # todo: infected plot in this case is the df, where actual values are missing.
-            # .. we either have to insert missing actual values beforehand for that time or impede function from plotting and plot it ourselves
-            # try to get better plot by creating own plot
             
-            
+            # todo: what other variables should be visualized?
+            _ = self.snl.history(target="Rt")
             _ = self.snl.history(target="rho").head()
             
     def simluate_scenario(self, name):
