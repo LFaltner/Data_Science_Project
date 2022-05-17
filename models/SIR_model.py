@@ -34,11 +34,9 @@ class SIR_model():
 
         self.start_cond()
         
-        self.main=False
-        self.create=False
+        self.main = False
+        self.create = False
 
-        #return self.df_timerange
-                
 
     def load_data(self):
         """
@@ -54,6 +52,7 @@ class SIR_model():
         data_loader = cs.DataLoader(directory=kaggle_path, update_interval=72)
 
         # The number of cases and population values in jhu format
+        print("Loading the data...")
         self.jhu_data = data_loader.jhu()
         # cases and deaths whole dataset
         self.total_df = self.jhu_data.total()
@@ -91,7 +90,9 @@ class SIR_model():
 
         self.actual_df, _ = self.jhu_data.records(country="Switzerland")
         self.actual_df = self.actual_df.set_index("Date")
-        self.actual_df.plot()
+
+        # plotting the dataframe over the whole timeframe
+        # self.actual_df.plot()
 
     def start_cond(self):
         self.start_fatal_recovered = self.df_timerange["Fatal"][0] + self.df_timerange["Recovered"][0]
@@ -102,17 +103,19 @@ class SIR_model():
         self.start_dict = {'Fatal or Recovered': self.start_fatal_recovered, 'Infected': self.start_infected,
                            'Susceptible': self.start_susceptible}
 
-    def create_sir(self, rho=None, sigma=None, plot=False):
+    def create_sir(self, rho: float = None, sigma: float = None, plot: bool = False):
         # todo: implement SIR-F model as its own class, not just as parameter (inher) (theta, kappa)
         """
         Creates SIR model and returns resulting data frame
 
         Parameters
         ----------
-        params : TYPE, optional
-            DESCRIPTION. The default is {'theta': 0.005, 'kappa': 0.005, 'rho': None, 'sigma': None}.
-        sir_f : TYPE, optional
-            DESCRIPTION. The default is False.
+        rho : FLOAT, optional
+            The default is rho=None.
+        sigma : FLOAT, optional
+            The default is sigma=None.
+        plot : BOOL, optional
+            The default is plot=False.
 
         Returns
         -------
@@ -161,19 +164,19 @@ class SIR_model():
         return self.res_df
 
     def check_params(self, params):
-        if params["rho"] == None and params["sigma"] == None:
+        if params["rho"] is None and params["sigma"] is None:
             print("No values for rho and sigma given. Estimation of both parameters, this may take a while...")
             params["rho"], params["sigma"] = self.parameter_estimation()
             print(f"Estimations: Rho = {params['rho']}, Sigma = {params['sigma']}\n\n")
             return params
 
-        elif params["rho"] == None:
+        elif params["rho"] is None:
             print("No value for rho given. Estimation of rho, this may take a while...")
             params["rho"], _ = self.parameter_estimation()
             print(f"Estimation: Rho = {params['rho']}\n\n")
             return params
 
-        elif params["sigma"] == None:
+        elif params["sigma"] is None:
             print("No value for sigma given. Estimation of sigma, this may take a while...")
             _, params["sigma"] = self.parameter_estimation()
             print(f"Estimation: Sigma = {params['sigma']}\n\n")
@@ -193,11 +196,11 @@ class SIR_model():
         self.snl = cs.Scenario(tau=1440, **self.area)
         self.snl.register(self.example_data)
 
-        # get the records of the scenario instance
-        #todo: ist das nötig?
-        record_df = self.snl.records(show_plot=False)
+        # todo: plot main scenario with actual records
+        # if show_figure=True, this plots the main scenario
+        record_df = self.snl.records(show_figure=False)
 
-        # Set 0th phase fro eg from 01Sep2020 to 01Dec2020 with preset parameter values
+        # Set 0th phase from e.g. 01Sep2020 to 01Dec2020 with preset parameter values
         self.snl.clear(include_past=True)
         # todo: falls sirf, sicherstellen alle parameter vorhande
         # todo: sicherstellen das alle create_sir vorher aufgerufen wurde!!
