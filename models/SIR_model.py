@@ -277,37 +277,63 @@ class SIR_model():
         self.confirmed_plot["Actual"] = self.actual_df.loc[mask]["Confirmed"].values
 
         # prepare plots
-        # todo: make plots bigger
-        fig, (ax_inf,ax_conf) = plt.subplots(nrows=2,ncols=1,sharex=True)
+        size_factor = 1.5  # sets the ylim value in relation to the maximum value of the actual data
+        fig, (ax_inf, ax_conf) = plt.subplots(nrows=2, ncols=1, sharex=True, figsize=(12, 12))
         ax_inf.set_title("Active Infected")
         ax_conf.set_title("Total confirmed cases")
         # plot actual and main infected
-        ax_inf.plot(self.infected_plot.index,self.infected_plot["Actual"],label="Acutal",color=self.colors["Actual"],alpha=0.5)
-        ax_inf.plot(self.infected_plot.index,self.infected_plot["Main"],label="Main",color=self.colors["Main"],alpha=0.5)
+        ax_inf.plot(self.infected_plot.index,
+                    self.infected_plot["Actual"],
+                    label="Actual",
+                    color=self.colors["Actual"],
+                    alpha=0.5)
+        ax_inf.plot(self.infected_plot.index,
+                    self.infected_plot["Main"],
+                    label="Main",
+                    color=self.colors["Main"],
+                    alpha=0.5)
+        ax_inf.set_ylim(top=max(self.infected_plot["Actual"] * size_factor), bottom=0)
+
         # plot actual and main confirmed
-        ax_conf.plot(self.confirmed_plot.index,self.confirmed_plot["Actual"],label="Acutal",color=self.colors["Actual"],alpha=0.5)
-        ax_conf.plot(self.confirmed_plot.index,self.confirmed_plot["Main"],label="Main",color=self.colors["Main"],alpha=0.5)
-        
-        
+        ax_conf.plot(self.confirmed_plot.index,
+                     self.confirmed_plot["Actual"],
+                     label="Actual",
+                     color=self.colors["Actual"],
+                     alpha=0.5)
+        ax_conf.plot(self.confirmed_plot.index,
+                     self.confirmed_plot["Main"],
+                     label="Main",
+                     color=self.colors["Main"],
+                     alpha=0.5)
+        ax_conf.set_ylim(top=max(self.confirmed_plot["Actual"] * size_factor), bottom=0)
+
         for name in self.scenario_names:
-            ax_inf.plot(self.infected_plot.index,self.infected_plot[name],label=name,color=self.colors[name],alpha=0.5)
-            ax_conf.plot(self.confirmed_plot.index,self.confirmed_plot[name],label=name,color=self.colors[name],alpha=0.5)
+            ax_inf.plot(self.infected_plot.index,
+                        self.infected_plot[name],
+                        label=name,
+                        color=self.colors[name],
+                        alpha=0.5)
+            ax_conf.plot(self.confirmed_plot.index,
+                         self.confirmed_plot[name],
+                         label=name,
+                         color=self.colors[name],
+                         alpha=0.5)
         plt.legend()
 
         if plot:
             # todo: what other variables should be visualized?
-            rt_history = self.snl.history(target="Rt",show_figure=False)
-            rho_history = self.snl.history(target="rho",show_figure=False)
-            sigma_history = self.snl.history(target="sigma",show_figure=False)
+            rt_history = self.snl.history(target="Rt", show_figure=False)
+            rho_history = self.snl.history(target="rho", show_figure=False)
+            sigma_history = self.snl.history(target="sigma", show_figure=False)
 
-            fig,(ax_rt,ax_rho,ax_sigma) = plt.subplots(nrows=3,ncols=1,sharex=True)
+            fig, (ax_rt, ax_rho, ax_sigma) = plt.subplots(nrows=3, ncols=1, sharex=True)
 
             temp_list = ["Main"]
             temp_list.extend(self.scenario_names)
             for name in temp_list:
-                ax_rt.plot(rt_history.index,rt_history[name],label=name,color=self.colors[name],alpha=0.5)
-                ax_rho.plot(rho_history.index,rho_history[name],label=name,color=self.colors[name],alpha=0.5)
-                ax_sigma.plot(sigma_history.index,sigma_history[name],label=name,color=self.colors[name],alpha=0.5)
+                ax_rt.plot(rt_history.index, rt_history[name], label=name, color=self.colors[name], alpha=0.5)
+                ax_rho.plot(rho_history.index, rho_history[name], label=name, color=self.colors[name], alpha=0.5)
+                ax_sigma.plot(sigma_history.index, sigma_history[name], label=name, color=self.colors[name], alpha=0.5)
             plt.legend()
         # todo: how to stop describe from printing
         return self.infected_plot,self.confirmed_plot #,self.snl.describe()       
