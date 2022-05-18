@@ -14,7 +14,7 @@ import sys
 import warnings
 
 # idea: implement __iter__, __str__
-phase_names = ["0th", "1st", "2nd", "3rd", "4th", "5th"]
+colors = ["r","g","b","m","black","brown"]
 
 
 class SIR_model():
@@ -36,9 +36,9 @@ class SIR_model():
         
         self.main=False
         self.create=False
-
-        #return self.df_timerange
-                
+        
+        self.color_list = colors
+        self.colors = {"Main":"y","Actual":"c"}                
 
     def load_data(self):
         """
@@ -232,6 +232,7 @@ class SIR_model():
             raise Warning("create main has to be called before create scenario")
         if name not in self.scenario_names:
             self.scenario_names.append(name)
+            self.colors[name] = self.color_list[len(self.scenario_names)-1]
         else:
             raise Warning("Scenario already exists")
         
@@ -276,24 +277,33 @@ class SIR_model():
         ax_inf.set_title("Active Infected")
         ax_conf.set_title("Total confirmed cases")
         # plot actual and main infected
-        ax_inf.plot(self.infected_plot.index,self.infected_plot["Actual"],label="Acutal")
-        ax_inf.plot(self.infected_plot.index,self.infected_plot["Main"],label="Main")
+        ax_inf.plot(self.infected_plot.index,self.infected_plot["Actual"],label="Acutal",color=self.colors["Actual"],alpha=0.5)
+        ax_inf.plot(self.infected_plot.index,self.infected_plot["Main"],label="Main",color=self.colors["Main"],alpha=0.5)
         # plot actual and main confirmed
-        ax_conf.plot(self.confirmed_plot.index,self.confirmed_plot["Actual"],label="Acutal")
-        ax_conf.plot(self.confirmed_plot.index,self.confirmed_plot["Main"],label="Main")
+        ax_conf.plot(self.confirmed_plot.index,self.confirmed_plot["Actual"],label="Acutal",color=self.colors["Actual"],alpha=0.5)
+        ax_conf.plot(self.confirmed_plot.index,self.confirmed_plot["Main"],label="Main",color=self.colors["Main"],alpha=0.5)
         
         
         for name in self.scenario_names:
-            ax_inf.plot(self.infected_plot.index,self.infected_plot[name],label=name)
-            ax_conf.plot(self.confirmed_plot.index,self.confirmed_plot[name],label=name)
+            ax_inf.plot(self.infected_plot.index,self.infected_plot[name],label=name,color=self.colors[name],alpha=0.5)
+            ax_conf.plot(self.confirmed_plot.index,self.confirmed_plot[name],label=name,color=self.colors[name],alpha=0.5)
         plt.legend()
         
         if plot:
             # todo: what other variables should be visualized?
-            _ = self.snl.history(target="Rt")
-            _ = self.snl.history(target="rho").head()
-            _ = self.snl.history(target="sigma").head()
+            rt_history = self.snl.history(target="Rt",show_figure=False)
+            rho_history = self.snl.history(target="rho",show_figure=False)
+            sigma_history = self.snl.history(target="sigma",show_figure=False)
             
+            fig,(ax_rt,ax_rho,ax_sigma) = plt.subplots(nrows=3,ncols=1,sharex=True)
+            
+            temp_list = ["Main"]
+            temp_list.extend(self.scenario_names)
+            for name in temp_list:
+                ax_rt.plot(rt_history.index,rt_history[name],label=name,color=self.colors[name],alpha=0.5)
+                ax_rho.plot(rho_history.index,rho_history[name],label=name,color=self.colors[name],alpha=0.5)
+                ax_sigma.plot(sigma_history.index,sigma_history[name],label=name,color=self.colors[name],alpha=0.5)
+            plt.legend()
         # todo: how to stop describe from printing
         return self.infected_plot,self.confirmed_plot #,self.snl.describe()       
      
