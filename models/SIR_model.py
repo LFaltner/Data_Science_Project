@@ -21,6 +21,7 @@ class SIR_model():
 
     def __init__(self, country, start_date, end_date):
         """
+        Call function for setup.
         Accepted date format: yyyy-mm-dd (e.g. 2020-12-24)
         """
 
@@ -44,9 +45,6 @@ class SIR_model():
         """
         Loads up-to-date data from kaggle and stores it as object variable.
 
-        Returns
-        -------
-        None.
         """
         # data will be downloaded if existing files are older than 72h
         print("Checking if data is up-to-date... ")
@@ -64,10 +62,7 @@ class SIR_model():
 
     def prep_data(self):
         """
-        extract clean data and subset for defined country
-        Returns
-        -------
-        None.
+        Extract clean data and subset for defined country.
 
         """
         # get rid of rows with missing data
@@ -97,6 +92,10 @@ class SIR_model():
         # self.actual_df.plot()
 
     def start_cond(self):
+        """
+        Extract starting conditions from data frame.
+
+        """
         self.start_fatal_recovered = self.df_timerange["Fatal"][0] + self.df_timerange["Recovered"][0]
         self.start_infected = self.df_timerange["Infected"][0]
         self.start_pop = self.df_timerange["Population"][0]
@@ -107,25 +106,12 @@ class SIR_model():
 
 
     def create_sir(self,params={"rho":None,"sigma":None},plot=False):
-        # todo: implement SIR-F model as its own class, not just as parameter (inher) (theta, kappa)
+
         """
-        Creates SIR model and returns resulting data frame
-
-        Parameters
-        ----------
-        params : TYPE, optional
-            DESCRIPTION. The default is {'theta': 0.005, 'kappa': 0.005, 'rho': None, 'sigma': None}.
-        sir_f : TYPE, optional
-            DESCRIPTION. The default is False.
-
-        Returns
-        -------
-        None.
+        Creates SIR model with defined parameters.
 
         """
         self.create = True
-        # todo: implement sir f
-        # todo: look what params are given and update them
 
         params = self.check_params(params)
 
@@ -136,7 +122,6 @@ class SIR_model():
         self.model.EXAMPLE['population'] = self.start_pop
         self.model.EXAMPLE['step_n'] = self.total_days
 
-        # todo: do check ich nix meh was passiert, stimmt so?
         # Set tau value and start date of records
         self.example_data = cs.ExampleData(tau=1440, start_date=self.start_date)
 
@@ -151,7 +136,6 @@ class SIR_model():
         df = self.example_data.cleaned()
 
         # prepare the result dataframe
-        # todo: make this drop more general. keep what we need not drop to be more flexible
         res_df = df.drop(["Country", "Province", "Confirmed", "ISO3", "Population"], axis=1)
 
         # add results from the model
@@ -163,6 +147,10 @@ class SIR_model():
         return self.res_df
 
     def check_params(self, params):
+        """
+        Check for correctness of input params.
+        """
+        
         if params["rho"] is None and params["sigma"] is None:
             print("No values for rho and sigma given. Estimation of both parameters, this may take a while...")
             params["rho"], params["sigma"] = self.parameter_estimation()
@@ -186,6 +174,10 @@ class SIR_model():
 
 
     def create_main(self):
+        """
+        Computes values of SIR model without any changes of parameters for the time range given
+        """
+        
         if not self.create:
             raise Warning("create_sir has to be called before create_main")
 
@@ -196,15 +188,13 @@ class SIR_model():
         self.snl = cs.Scenario(tau=1440, **self.area)
         self.snl.register(self.example_data)
 
-        # todo: plot main scenario with actual records
+
         # if show_figure=True, this plots the main scenario
         record_df = self.snl.records(show_figure=False)
 
         # Set 0th phase from e.g. 01Sep2020 to 01Dec2020 with preset parameter values
         self.snl.clear(include_past=True)
-        # todo: falls sirf, sicherstellen alle parameter vorhande
-        # todo: sicherstellen das alle create_sir vorher aufgerufen wurde!!
-        # todo: nicht das gleiche param dict wir params von create_sir?
+
 
         # past phase
         self.snl.add(end_date=self.end_date, model=self.model, **self.model.EXAMPLE["param_dict"])
@@ -214,20 +204,9 @@ class SIR_model():
     
     def create_scenario(self, name, scenario_end_list,rho_constant_list=None,sigma_constant_list=None,plot=False):
         """
-        adding measures and therefore possible changes to parameters
-
-        Parameters
-        ----------
-         : TYPE
-            DESCRIPTION.
-
-        Returns
-        -------
-        None.
+        Creating scenarios: gives ability to change parameters at specific points in times, which faciliates the modeling of real world measures.
 
         """
-        # todo: check that all inputs are lists
-        #todo: check that all lists have same length
 
 
         # create main has to be called before create scenario
@@ -243,10 +222,8 @@ class SIR_model():
         self.snl.clear(name=name)
         
 
-        #todo: only add main scenario once, so that new scenarios can be added without probelms
         for i,(phase_date, rho_constant, sigma_constant) in enumerate(zip(scenario_end_list,rho_constant_list,sigma_constant_list)):
             phase_date = pd.to_datetime(phase_date)
-            # todo: cant main be renamed to something more meaingful?
             # only add phase if it goes beyond last added phase
             if phase_date > self.last_phase_added:
                 self.snl.add(end_date=phase_date, name="Main")
@@ -263,8 +240,7 @@ class SIR_model():
 
         # print summary
         print(f"{self.snl.summary()}")
-        # todo: make sure smae scenario has same color in all plots
-        # todo: plot estimated "rho" of real life?
+
         # get dataframe with Infected, Main, and scenario
 
         self.infected_plot = self.snl.history(target="Infected",show_figure=False)
@@ -321,7 +297,6 @@ class SIR_model():
         plt.legend()
 
         if plot:
-            # todo: what other variables should be visualized?
             rt_history = self.snl.history(target="Rt", show_figure=False)
             rho_history = self.snl.history(target="rho", show_figure=False)
             sigma_history = self.snl.history(target="sigma", show_figure=False)
@@ -338,7 +313,10 @@ class SIR_model():
       
      
     def simulate_scenario(self, name):
-        #todo: raise error wenn name kein scenario ist
+        """
+        SIR model representation of scenario specified with name
+        """
+
         if name not in self.scenario_names:
             raise Warning("Scenario does not exist")
         df = self.snl.simulate(name = name)
@@ -349,13 +327,10 @@ class SIR_model():
         """
         Getter-function for resulting datafram
 
-        Returns self.res_df
-        -------
-        None.
         """
         try:
             return self.res_df
-        # todo: insert correct error
+
         except:
             raise Warning("No res_df. Run create_sir first")
 
@@ -385,27 +360,25 @@ class SIR_model():
         estimation_df = srt.summary()
 
         # the mean of the first 3 phases will be used for a first estimation
-        # todo: Better way to estimate? Maybe being able to select a distinct phase?
+
         rho_est = round(estimation_df["rho"].iloc[[0, 1, 2]].mean(axis=0), 4)
         sigma_est = round(estimation_df["sigma"].iloc[[0, 1, 2]].mean(axis=0), 4)
 
         return rho_est, sigma_est
 
-    def get_plot(self):
-        # idea: funktion um plots zu returnen
-        pass
 
 
 def one_scenario():
+    """
+    one possible example for the use our class
+    """
     start_date = '2020-09-01'
     end_date = '2021-03-01'
     country = "Switzerland"
     a = SIR_model(country, start_date, end_date)
-    a.create_sir(rho=0.5, sigma=0.0)
+    a.create_sir(rho=0.1, sigma=0.08)
     a.create_main()
     a.create_scenario(name="Lockdown", scenario_end_list=["31Mar2021", "20Apr2021", "30Apr2021"],
                       rho_constant_list=[0.5, 2, 0.5], sigma_constant_list=[2, 0.5, 1], plot=True)
 
 
-def mul_scenarios():
-    pass
