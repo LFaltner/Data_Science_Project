@@ -266,10 +266,10 @@ class SIR_model():
         # todo: make sure smae scenario has same color in all plots
         # todo: plot estimated "rho" of real life?
         # get dataframe with Infected, Main, and scenario
-        print("\nActive Infected Data Frame")
+
         self.infected_plot = self.snl.history(target="Infected",show_figure=False)
         # get dataframe for total confirmed cases
-        print("Total confirmed Data Frame")
+
         self.confirmed_plot = self.snl.history(target="Confirmed",show_figure=False)
 
         mask = np.array([(pd.to_datetime(self.actual_df.index) >= self.infected_plot.index[0]) & (pd.to_datetime(self.actual_df.index) <= self.infected_plot.index[-1])]).reshape(-1)
@@ -335,8 +335,7 @@ class SIR_model():
                 ax_rho.plot(rho_history.index, rho_history[name], label=name, color=self.colors[name], alpha=0.5)
                 ax_sigma.plot(sigma_history.index, sigma_history[name], label=name, color=self.colors[name], alpha=0.5)
             plt.legend()
-        # todo: how to stop describe from printing
-        return self.infected_plot,self.confirmed_plot #,self.snl.describe()       
+      
      
     def simulate_scenario(self, name):
         #todo: raise error wenn name kein scenario ist
